@@ -1,11 +1,229 @@
 basePath: /
+definitions:
+  auth.TokenPair:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  gorm.DeletedAt:
+    properties:
+      time:
+        type: string
+      valid:
+        description: Valid is true if Time is not NULL
+        type: boolean
+    type: object
+  model.Patient:
+    properties:
+      created_at:
+        type: string
+      date_of_birth:
+        type: string
+      deleted_at:
+        $ref: '#/definitions/gorm.DeletedAt'
+      email:
+        type: string
+      firstname_en:
+        type: string
+      firstname_th:
+        type: string
+      gender:
+        type: string
+      hospital_id:
+        type: string
+      id:
+        type: string
+      lastname_en:
+        type: string
+      lastname_th:
+        type: string
+      middlename_en:
+        type: string
+      middlename_th:
+        type: string
+      national_id:
+        type: string
+      passport_id:
+        type: string
+      patient_hn:
+        type: string
+      phone_number:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  patient.searchRequest:
+    properties:
+      date_of_birth:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      middle_name:
+        type: string
+      national_id:
+        type: string
+      passport_id:
+        type: string
+      phone_number:
+        type: string
+    type: object
+  staff.createRequest:
+    properties:
+      hospital:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - hospital
+    - password
+    - username
+    type: object
+  staff.loginRequest:
+    properties:
+      hospital:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - hospital
+    - password
+    - username
+    type: object
+  utils.ErrorResponse:
+    properties:
+      message:
+        type: string
+      status:
+        type: integer
+    type: object
 host: localhost:8080
 info:
   contact: {}
   description: API documentation for Hospital Middleware System
   title: Hospital Middleware System
   version: "1"
-paths: {}
+paths:
+  /patient/search:
+    post:
+      consumes:
+      - application/json
+      description: Searches patients scoped to the logged-in staff's hospital. All
+        fields are optional.
+      parameters:
+      - description: Search filters
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/patient.searchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Patient'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Search patients
+      tags:
+      - patient
+  /staff/create:
+    post:
+      consumes:
+      - application/json
+      description: Creates a staff login scoped to a single hospital.
+      parameters:
+      - description: Staff credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/staff.createRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Create a new hospital staff member
+      tags:
+      - staff
+  /staff/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a staff member scoped to a hospital and issues a
+        JWT token pair.
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/staff.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.TokenPair'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Staff login
+      tags:
+      - staff
 produces:
 - application/json
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and the access token, e.g. "Bearer
+      eyJhbGc..."
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
