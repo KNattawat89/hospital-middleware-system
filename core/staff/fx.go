@@ -8,6 +8,7 @@ import (
 var Module = fx.Module(
 	"core/staff",
 	fx.Provide(
+		NewRepo,
 		NewService,
 		fx.Annotate(
 			NewHandler,

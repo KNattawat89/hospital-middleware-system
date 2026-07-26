@@ -23,9 +23,14 @@ const (
 // ID) is stored under once a request passes authorization.
 const ContextSubjectKey = "auth_subject"
 
+// ContextHospitalIDKey is the gin.Context key the subject's hospital ID is
+// stored under once a request passes authorization.
+const ContextHospitalIDKey = "auth_hospital_id"
+
 type Claims struct {
 	jwt.RegisteredClaims
-	Type TokenType `json:"typ"`
+	Type       TokenType `json:"typ"`
+	HospitalID string    `json:"hospital_id"`
 }
 
 type TokenPair struct {
@@ -36,8 +41,9 @@ type TokenPair struct {
 // AuthorizeResult is returned by Authorize. NewTokens is non-nil only when
 // the access token had expired and was transparently renewed via the refresh token.
 type AuthorizeResult struct {
-	Subject   string
-	NewTokens *TokenPair
+	Subject    string
+	HospitalID string
+	NewTokens  *TokenPair
 }
 
 // Service validates and issues JWT access/refresh tokens.
@@ -70,14 +76,16 @@ func NewService(cfg *config.Config) (*Service, error) {
 }
 
 // GenerateTokenPair issues a fresh access/refresh token pair for the given
-// subject (typically a user/staff ID).
-func (s *Service) GenerateTokenPair(subject string) (*TokenPair, error) {
-	access, err := s.sign(subject, TokenTypeAccess, s.accessTTL)
+// subject (typically a user/staff ID), scoped to hospitalID so downstream
+// handlers can trust which hospital the subject belongs to without a DB
+// round trip.
+func (s *Service) GenerateTokenPair(subject, hospitalID string) (*TokenPair, error) {
+	access, err := s.sign(subject, hospitalID, TokenTypeAccess, s.accessTTL)
 	if err != nil {
 		return nil, fmt.Errorf("sign access token: %w", err)
 	}
 
-	refresh, err := s.sign(subject, TokenTypeRefresh, s.refreshTTL)
+	refresh, err := s.sign(subject, hospitalID, TokenTypeRefresh, s.refreshTTL)
 	if err != nil {
 		return nil, fmt.Errorf("sign refresh token: %w", err)
 	}
@@ -91,7 +99,7 @@ func (s *Service) GenerateTokenPair(subject string) (*TokenPair, error) {
 func (s *Service) Authorize(accessToken, refreshToken string) (*AuthorizeResult, error) {
 	claims, err := s.parse(accessToken, TokenTypeAccess)
 	if err == nil {
-		return &AuthorizeResult{Subject: claims.Subject}, nil
+		return &AuthorizeResult{Subject: claims.Subject, HospitalID: claims.HospitalID}, nil
 	}
 
 	if !errors.Is(err, jwt.ErrTokenExpired) {
@@ -103,12 +111,12 @@ func (s *Service) Authorize(accessToken, refreshToken string) (*AuthorizeResult,
 		return nil, fmt.Errorf("refresh token invalid: %w", err)
 	}
 
-	pair, err := s.GenerateTokenPair(refreshClaims.Subject)
+	pair, err := s.GenerateTokenPair(refreshClaims.Subject, refreshClaims.HospitalID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &AuthorizeResult{Subject: refreshClaims.Subject, NewTokens: pair}, nil
+	return &AuthorizeResult{Subject: refreshClaims.Subject, HospitalID: refreshClaims.HospitalID, NewTokens: pair}, nil
 }
 
 // Middleware is Gin middleware guarding routes behind a valid (or
@@ -136,11 +144,12 @@ func (s *Service) Middleware() gin.HandlerFunc {
 		}
 
 		c.Set(ContextSubjectKey, result.Subject)
+		c.Set(ContextHospitalIDKey, result.HospitalID)
 		c.Next()
 	}
 }
 
-func (s *Service) sign(subject string, typ TokenType, ttl time.Duration) (string, error) {
+func (s *Service) sign(subject, hospitalID string, typ TokenType, ttl time.Duration) (string, error) {
 	now := time.Now()
 
 	claims := Claims{
@@ -149,7 +158,8 @@ func (s *Service) sign(subject string, typ TokenType, ttl time.Duration) (string
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
 		},
-		Type: typ,
+		Type:       typ,
+		HospitalID: hospitalID,
 	}
 
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
