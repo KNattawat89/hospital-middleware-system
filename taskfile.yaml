@@ -1,0 +1,73 @@
+version: "3"
+
+dotenv: [".env"]
+
+env:
+  WORKING_DIR: "{{.USER_WORKING_DIR}}"
+
+tasks:
+  db-migrate-up:
+    desc: Run database migrations up
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - goose up
+
+  db-migrate-down:
+    desc: Run database migrations down
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - goose down
+
+  gen-swagger:
+    desc: Generate swagger docs
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - swag init --parseDependency --parseInternal
+
+  backend:mock:
+    desc: Generate mocks for unit tests
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - rm -rf ./mock && mockery
+
+  backend:test:unit:
+    desc: Run unit tests
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - go test -count=1 -cover -covermode=atomic ./core/... -parallel 8
+
+  backend:test:
+    desc: Run backend unit tests
+    cmds:
+      - task backend:test:unit
+
+  gen-repo:
+    desc: Generate the repo
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - go run ./cmd/gen-repo
+
+  gen-model:
+    desc: Generate Models
+    cmds:
+      - go run ./cmd/gen-model/main.go
+
+  dev:
+    desc: "Run the application in development mode"
+    cmds:
+      - go run . -debug
+
+  backend:dev:
+    desc: Run the backend in development mode
+    cmds:
+      - task gen-swagger
+      - go run -trimpath . -debug
+
+  backend:
+    desc: Alias for backend:dev
+    cmds:
+      - task backend:dev
+
+  default:
+    parallel: true
+    deps: [backend:dev]

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"exit: $?\")",
+      "Bash(go vet *)",
+      "Bash(go mod *)",
+      "Bash(go build *)",
+      "Bash(command -v goimports)"
+    ]
+  }
+}

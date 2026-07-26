@@ -1,0 +1,11 @@
+basePath: /
+host: localhost:8080
+info:
+  contact: {}
+  description: API documentation for Hospital Middleware System
+  title: Hospital Middleware System
+  version: "1"
+paths: {}
+produces:
+- application/json
+swagger: "2.0"

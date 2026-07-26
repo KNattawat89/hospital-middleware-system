@@ -1,0 +1,15 @@
+{
+    "produces": [
+        "application/json"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "API documentation for Hospital Middleware System",
+        "title": "Hospital Middleware System",
+        "contact": {},
+        "version": "1"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {}
+}
