@@ -1,0 +1,12 @@
+with-expecter: true
+dir: "mock/{{.PackageName}}"
+outpkg: "mock{{.PackageName}}"
+packages:
+  github.com/KNattawat89/hospital-middleware-system/core/staff:
+    interfaces:
+      Repo:
+      TokenIssuer:
+  github.com/KNattawat89/hospital-middleware-system/core/patient:
+    interfaces:
+      Repo:
+      HISClient:

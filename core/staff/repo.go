@@ -5,6 +5,7 @@
 package staff
 
 import (
+	"github.com/KNattawat89/hospital-middleware-system/infra/db/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -13,6 +14,10 @@ type Repo interface {
 	WithTx(TxFunc) error
 
 	// Auto Generated
+	CreateStaff(staffRecord *model.Staff) error
+	FindByHospitalAndUsername(hospitalID string, username string) (*model.Staff, error)
+	FindHospitalByCode(code string) (*model.Hospital, error)
+	TouchLastLoginAt(id string) error
 }
 
 func NewRepo(db *gorm.DB, log *zap.Logger) Repo {
