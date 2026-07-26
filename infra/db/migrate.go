@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// go:embed migrations/*
+//go:embed migrations/*
 var embedMigrations embed.FS
 
 func Migrate(config *config.Config, db *gorm.DB) error {

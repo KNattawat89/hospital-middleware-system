@@ -6,8 +6,8 @@ package model
 
 import (
 	"time"
-	"uuid"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -16,10 +16,10 @@ const TableNamePatient = "patients"
 // Patient mapped from table <patients>
 type Patient struct {
 	ID           *uuid.UUID     `gorm:"column:id;type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
-	HospitalID   *uuid.UUID     `gorm:"column:hospital_id;type:uuid;not null;uniqueIndex:patients_hospital_id_national_id_idx,priority:1;uniqueIndex:patients_hospital_id_passport_id_idx,priority:1" json:"hospital_id"`
-	NationalID   *uuid.UUID     `gorm:"column:national_id;type:character varying(13);uniqueIndex:patients_hospital_id_national_id_idx,priority:2" json:"national_id"`
-	PassportID   *uuid.UUID     `gorm:"column:passport_id;type:character varying(9);uniqueIndex:patients_hospital_id_passport_id_idx,priority:2" json:"passport_id"`
-	PatientHn    *string        `gorm:"column:patient_hn;type:character varying(20)" json:"patient_hn"`
+	HospitalID   *uuid.UUID     `gorm:"column:hospital_id;type:uuid;not null;uniqueIndex:patients_hospital_id_national_id_idx,priority:1;uniqueIndex:patients_hospital_id_passport_id_idx,priority:1;uniqueIndex:patients_hospital_id_patient_hn_idx,priority:1" json:"hospital_id"`
+	NationalID   *string        `gorm:"column:national_id;type:character varying(13);uniqueIndex:patients_hospital_id_national_id_idx,priority:2" json:"national_id"`
+	PassportID   *string        `gorm:"column:passport_id;type:character varying(9);uniqueIndex:patients_hospital_id_passport_id_idx,priority:2" json:"passport_id"`
+	PatientHn    *string        `gorm:"column:patient_hn;type:character varying(20);uniqueIndex:patients_hospital_id_patient_hn_idx,priority:2" json:"patient_hn"`
 	FirstnameTh  *string        `gorm:"column:firstname_th;type:character varying(100)" json:"firstname_th"`
 	MiddlenameTh *string        `gorm:"column:middlename_th;type:character varying(100)" json:"middlename_th"`
 	LastnameTh   *string        `gorm:"column:lastname_th;type:character varying(100)" json:"lastname_th"`
