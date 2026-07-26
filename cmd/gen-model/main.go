@@ -167,8 +167,15 @@ func generateModels(g *gen.Generator, tables []string) {
 	}
 }
 
+// nonUUIDIDColumns lists columns ending in "id" that are not actually UUIDs
+// (e.g. Thai national ID / passport numbers are plain strings).
+var nonUUIDIDColumns = []string{"national_id", "passport_id"}
+
 func isUUIDColumn(column string) bool {
 	column = strings.ToLower(column)
+	if gut.Contain(nonUUIDIDColumns, column) {
+		return false
+	}
 	return strings.HasSuffix(column, "id") || column == "id"
 }
 

@@ -8,6 +8,8 @@ import (
 var Module = fx.Module(
 	"core/patient",
 	fx.Provide(
+		NewRepo,
+		NewHISClient,
 		NewService,
 		fx.Annotate(
 			NewHandler,

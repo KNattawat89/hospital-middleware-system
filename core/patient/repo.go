@@ -5,6 +5,7 @@
 package patient
 
 import (
+	"github.com/KNattawat89/hospital-middleware-system/infra/db/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -13,6 +14,11 @@ type Repo interface {
 	WithTx(TxFunc) error
 
 	// Auto Generated
+	FindByHospitalAndNationalID(hospitalID string, nationalID string) (*model.Patient, error)
+	FindByHospitalAndPassportID(hospitalID string, passportID string) (*model.Patient, error)
+	FindHospitalByID(id string) (*model.Hospital, error)
+	SearchPatients(filters SearchFilters) ([]*model.Patient, error)
+	UpsertPatient(patientRecord *model.Patient) error
 }
 
 func NewRepo(db *gorm.DB, log *zap.Logger) Repo {
