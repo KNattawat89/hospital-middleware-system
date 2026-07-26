@@ -1,6 +1,7 @@
 package infra
 
 import (
+	"github.com/KNattawat89/hospital-middleware-system/infra/auth"
 	"github.com/KNattawat89/hospital-middleware-system/infra/config"
 	"github.com/KNattawat89/hospital-middleware-system/infra/web"
 	"go.uber.org/fx"
@@ -12,6 +13,7 @@ var Modules = fx.Module(
 		config.NewConfig,
 		NewLogger,
 	),
+	auth.Module,
 	web.Module,
 
 	fx.Invoke(
