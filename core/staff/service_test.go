@@ -1,9 +1,11 @@
 package staff
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/KNattawat89/hospital-middleware-system/infra/auth"
+	"github.com/KNattawat89/hospital-middleware-system/infra/config"
 	"github.com/KNattawat89/hospital-middleware-system/infra/db/model"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -214,4 +216,124 @@ func TestService_Login(t *testing.T) {
 			t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 		}
 	})
+}
+
+func TestService_Create_RepoErrorsPropagate(t *testing.T) {
+	hospitalID := uuid.New()
+
+	t.Run("generic error checking existing username propagates", func(t *testing.T) {
+		repo := &fakeRepo{
+			findHospitalByCode: func(code string) (*model.Hospital, error) {
+				return &model.Hospital{ID: &hospitalID, Code: &code}, nil
+			},
+			findByHospitalAndUsername: func(hospitalID, username string) (*model.Staff, error) {
+				return nil, errors.New("db down")
+			},
+		}
+		s := &Service{repo: repo, tokens: &fakeTokenIssuer{}, log: zap.NewNop()}
+
+		_, err := s.Create(CreateInput{Username: "x", Password: "y", Hospital: "HOSPITAL_A"})
+		if err == nil || err == ErrHospitalNotFound || err == ErrUsernameTaken {
+			t.Fatalf("expected a wrapped generic error, got %v", err)
+		}
+	})
+
+	t.Run("create failure propagates", func(t *testing.T) {
+		repo := &fakeRepo{
+			findHospitalByCode: func(code string) (*model.Hospital, error) {
+				return &model.Hospital{ID: &hospitalID, Code: &code}, nil
+			},
+			findByHospitalAndUsername: func(hospitalID, username string) (*model.Staff, error) {
+				return nil, gorm.ErrRecordNotFound
+			},
+			createStaff: func(staffRecord *model.Staff) error {
+				return errors.New("insert failed")
+			},
+		}
+		s := &Service{repo: repo, tokens: &fakeTokenIssuer{}, log: zap.NewNop()}
+
+		_, err := s.Create(CreateInput{Username: "x", Password: "y", Hospital: "HOSPITAL_A"})
+		if err == nil {
+			t.Fatalf("expected error to propagate from CreateStaff failure")
+		}
+	})
+}
+
+func TestService_Login_RepoAndTokenErrors(t *testing.T) {
+	hospitalID := uuid.New()
+	staffID := uuid.New()
+	hashed := hashPassword(t, "correct-password")
+
+	t.Run("generic error finding staff propagates", func(t *testing.T) {
+		repo := &fakeRepo{
+			findHospitalByCode: func(code string) (*model.Hospital, error) {
+				return &model.Hospital{ID: &hospitalID, Code: &code}, nil
+			},
+			findByHospitalAndUsername: func(hospitalID, username string) (*model.Staff, error) {
+				return nil, errors.New("db down")
+			},
+		}
+		s := &Service{repo: repo, tokens: &fakeTokenIssuer{}, log: zap.NewNop()}
+
+		_, err := s.Login(LoginInput{Username: "x", Password: "y", Hospital: "HOSPITAL_A"})
+		if err == nil || err == ErrInvalidCredentials {
+			t.Fatalf("expected a wrapped generic error, got %v", err)
+		}
+	})
+
+	t.Run("token generation failure propagates", func(t *testing.T) {
+		repo := &fakeRepo{
+			findHospitalByCode: func(code string) (*model.Hospital, error) {
+				return &model.Hospital{ID: &hospitalID, Code: &code}, nil
+			},
+			findByHospitalAndUsername: func(hospitalID, username string) (*model.Staff, error) {
+				return &model.Staff{ID: &staffID, PasswordHashed: &hashed}, nil
+			},
+		}
+		tokens := &fakeTokenIssuer{err: errors.New("signing failed")}
+		s := &Service{repo: repo, tokens: tokens, log: zap.NewNop()}
+
+		_, err := s.Login(LoginInput{Username: "nurse001", Password: "correct-password", Hospital: "HOSPITAL_A"})
+		if err == nil {
+			t.Fatalf("expected error to propagate from token generation failure")
+		}
+	})
+
+	t.Run("touch last login failure does not fail the login", func(t *testing.T) {
+		repo := &fakeRepo{
+			findHospitalByCode: func(code string) (*model.Hospital, error) {
+				return &model.Hospital{ID: &hospitalID, Code: &code}, nil
+			},
+			findByHospitalAndUsername: func(hospitalID, username string) (*model.Staff, error) {
+				return &model.Staff{ID: &staffID, PasswordHashed: &hashed}, nil
+			},
+			touchLastLoginAt: func(id string) error {
+				return errors.New("write failed")
+			},
+		}
+		tokens := &fakeTokenIssuer{pair: &auth.TokenPair{AccessToken: "access", RefreshToken: "refresh"}}
+		s := &Service{repo: repo, tokens: tokens, log: zap.NewNop()}
+
+		pair, err := s.Login(LoginInput{Username: "nurse001", Password: "correct-password", Hospital: "HOSPITAL_A"})
+		if err != nil {
+			t.Fatalf("expected login to still succeed despite the bookkeeping failure, got: %v", err)
+		}
+		if pair.AccessToken != "access" {
+			t.Fatalf("expected access token to be returned")
+		}
+	})
+}
+
+func TestNewService(t *testing.T) {
+	authService, err := auth.NewService(&config.Config{
+		Jwt: config.JwtConfig{Secret: "test-secret", AccessTokenTTL: "15m", RefreshTokenTTL: "1h"},
+	})
+	if err != nil {
+		t.Fatalf("build auth service: %v", err)
+	}
+
+	s := NewService(&fakeRepo{}, authService, zap.NewNop())
+	if s == nil {
+		t.Fatal("expected NewService to return a non-nil service")
+	}
 }

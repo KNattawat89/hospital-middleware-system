@@ -1,6 +1,7 @@
 package patient
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -117,4 +118,58 @@ func TestHandler_Search_ScopesToStaffHospital(t *testing.T) {
 	if gotHospitalID != hospitalID.String() {
 		t.Fatalf("expected search scoped to token's hospital %s, got %s", hospitalID.String(), gotHospitalID)
 	}
+}
+
+func TestHandler_Search_BadRequestsAndErrors(t *testing.T) {
+	authService := newAuthService(t, "15m", "168h")
+	hospitalID := uuid.New()
+
+	newAuthedRequest := func(body string) *http.Request {
+		pair, err := authService.GenerateTokenPair(uuid.NewString(), hospitalID.String())
+		if err != nil {
+			t.Fatalf("generate token pair: %v", err)
+		}
+		req := httptest.NewRequest(http.MethodPost, "/patient/search", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+pair.AccessToken)
+		return req
+	}
+
+	t.Run("invalid JSON body returns 400", func(t *testing.T) {
+		router := newTestRouter(&Service{repo: &fakeRepo{}, his: &fakeHISClient{}, log: zap.NewNop()}, authService)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, newAuthedRequest(`{not-json`))
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("invalid date_of_birth returns 400", func(t *testing.T) {
+		router := newTestRouter(&Service{repo: &fakeRepo{}, his: &fakeHISClient{}, log: zap.NewNop()}, authService)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, newAuthedRequest(`{"date_of_birth":"not-a-date"}`))
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("service error returns 500", func(t *testing.T) {
+		repo := &fakeRepo{
+			searchPatients: func(filters SearchFilters) ([]*model.Patient, error) {
+				return nil, errors.New("db exploded")
+			},
+		}
+		router := newTestRouter(&Service{repo: repo, his: &fakeHISClient{}, log: zap.NewNop()}, authService)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, newAuthedRequest(`{}`))
+
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+		}
+	})
 }

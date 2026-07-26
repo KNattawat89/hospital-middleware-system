@@ -1,6 +1,7 @@
 package staff
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -158,6 +159,59 @@ func TestHandler_Login(t *testing.T) {
 
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func TestHandler_Create_GenericErrorReturns500(t *testing.T) {
+	repo := &fakeRepo{
+		findHospitalByCode: func(code string) (*model.Hospital, error) {
+			return nil, errors.New("db down")
+		},
+	}
+	router := newTestRouter(&Service{repo: repo, tokens: &fakeTokenIssuer{}, log: zap.NewNop()})
+
+	req := httptest.NewRequest(http.MethodPost, "/staff/create", strings.NewReader(
+		`{"username":"x","password":"y","hospital":"HOSPITAL_A"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandler_Login_BadRequestAndGenericError(t *testing.T) {
+	t.Run("invalid JSON body returns 400", func(t *testing.T) {
+		router := newTestRouter(&Service{repo: &fakeRepo{}, tokens: &fakeTokenIssuer{}, log: zap.NewNop()})
+
+		req := httptest.NewRequest(http.MethodPost, "/staff/login", strings.NewReader(`{not-json`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("generic error returns 500", func(t *testing.T) {
+		repo := &fakeRepo{
+			findHospitalByCode: func(code string) (*model.Hospital, error) {
+				return nil, errors.New("db down")
+			},
+		}
+		router := newTestRouter(&Service{repo: repo, tokens: &fakeTokenIssuer{}, log: zap.NewNop()})
+
+		req := httptest.NewRequest(http.MethodPost, "/staff/login", strings.NewReader(
+			`{"username":"x","password":"y","hospital":"HOSPITAL_A"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
 		}
 	})
 }
